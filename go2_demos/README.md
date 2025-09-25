@@ -26,7 +26,6 @@ source ~/go2_ws/install/setup.bash
 ```bash
 ros2 launch go2_config gazebo.launch.py
 ```
-
 (If your launch already spawns the robot, you can skip A.3.)
 
 ---
@@ -39,32 +38,66 @@ ros2 service list | grep /spawn_entity              # sanity check
 ros2 topic echo --once /robot_description           # should print XML-like string
 ros2 run gazebo_ros spawn_entity.py -entity go2 -topic /robot_description -robot_namespace /go2
 ```
-
 > If spawn says “waiting for service to become available…”, your simulator isn’t running *with ROS API* (make sure Terminal A is on `gazebo.launch.py` and not paused/stopped; do not Ctrl+Z).
 
 ---
 
-### A.4 Terminal B — Run a **simple script** (publish `/cmd_vel` for a few seconds)
+### A.4 Terminal B — Run a **simple script**
 
-**Option 1: one-liner Twist publisher (quick nudge):**
+#### A.4.1 Quick nudge (no code)
 ```bash
 ros2 topic info /cmd_vel          # should show "Subscription count: ≥1"
-ros2 topic hz /odom               # ~50 Hz typical
-ros2 topic pub -r 5 /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.15}, angular: {z: 0.0}}"
+ros2 topic hz /odom               # ~50 Hz typical (or /odom/local if that's active)
+ros2 topic pub -r 10 /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.15}, angular: {z: 0.0}}"
 # Ctrl+C to stop; or send a single zero Twist:
 # ros2 topic pub -1 /cmd_vel geometry_msgs/msg/Twist "{}"
 ```
 
-**Option 2: your demo node (square path):**
+#### A.4.2 Square demo (if you built `go2_demos`)
 ```bash
 ros2 run go2_demos square_driver \
   --ros-args -p cmd_vel_topic:=/cmd_vel -p odom_topic:=/odom
 ```
 
-> If your topics are namespaced (e.g. `/go2/cmd_vel`, `/go2/odom`), pass those in the parameters above.
+#### A.4.3 **Run `move.py` (forward 1 m → left 90° → right 90°)**
 
-**If the robot runs away**:  
-Pause → stop Twist → unpause:
+**File location (default):**  
+`~/Documents/research/robodog/autonomous_robodog/go2_demos/go2_demos/move.py`
+
+**One-time:** make it executable
+```bash
+chmod +x ~/Documents/research/robodog/autonomous_robodog/go2_demos/go2_demos/move.py
+```
+
+**Run it (from anywhere):**
+```bash
+./Documents/research/robodog/autonomous_robodog/go2_demos/go2_demos/move.py \
+  --ros-args \
+  -p cmd_vel_topic:=/cmd_vel \
+  -p odom_topic:=/odom \
+  -p odom_reliable:=false
+# If your active odom is different (e.g. /odom/local), swap it:
+#   -p odom_topic:=/odom/local
+```
+Alternative (without `chmod +x`):
+```bash
+python3 ~/Documents/research/robodog/autonomous_robodog/go2_demos/go2_demos/move.py \
+  --ros-args -p cmd_vel_topic:=/cmd_vel -p odom_topic:=/odom -p odom_reliable:=false
+```
+
+**Sanity if it doesn’t move:**
+```bash
+ros2 service call /gazebo/unpause_physics std_srvs/srv/Empty "{}"
+ros2 topic info /cmd_vel             # Subscription count ≥ 1
+ros2 topic info /odom                # Publisher count ≥ 1 (or check /odom/local)
+ros2 topic hz /odom                  # should tick; otherwise try /odom/local
+```
+**Emergency stop / zero twist:**
+```bash
+ros2 topic pub -1 /cmd_vel geometry_msgs/msg/Twist "{}"
+```
+
+**If the robot runs away** (pause → stop → unpause):
 ```bash
 ros2 service call /gazebo/pause_physics std_srvs/srv/Empty "{}"
 ros2 topic pub -1 /cmd_vel geometry_msgs/msg/Twist "{}"
@@ -78,6 +111,9 @@ ros2 service call /gazebo/delete_entity gazebo_msgs/srv/DeleteEntity "{name: go2
 ros2 run gazebo_ros spawn_entity.py -entity go2 -topic /robot_description -robot_namespace /go2
 ros2 service call /gazebo/unpause_physics std_srvs/srv/Empty "{}"
 ```
+
+> Tip: If you want a hard time limit so it can’t hang, prefix with `timeout`, e.g.  
+> `timeout 60s ./move.py --ros-args -p cmd_vel_topic:=/cmd_vel -p odom_topic:=/odom -p odom_reliable:=false`
 
 ---
 
@@ -165,7 +201,6 @@ ros2 run gazebo_ros spawn_entity.py -entity go2 -topic /robot_description -robot
 ros2 service call /gazebo/unpause_physics std_srvs/srv/Empty "{}" >/dev/null
 echo "[respawn] Done."
 ```
-
 **Usage pattern:**
 ```bash
 ./stop_all.sh
@@ -201,7 +236,7 @@ echo "[respawn] Done."
 
 - **`/controller_manager/list_controllers` timeouts** → wrong manager path; try `/controller_manager` vs `/go2/controller_manager` depending on how you launched.
 
-- **`/cmd_vel` has subscribers but robot doesn’t move** → your active controller is trajectory-based; start the gait/bridge node (CHAMP/Go2) or publish a `JointTrajectory` directly to the controller topic.
+- **`/cmd_vel` has subscribers but robot doesn’t move`** → your active controller is trajectory-based; start the gait/bridge node (CHAMP/Go2) or publish a `JointTrajectory` directly to the controller topic.
 
 - **GUI model DB warnings** → set `GAZEBO_MODEL_DATABASE_URI=""` or ignore (local models still load).
 
@@ -214,7 +249,6 @@ echo "[respawn] Done."
 > Only needed when setting up a new machine; otherwise skip to A).
 
 ### D.1 Add keyrings & repos
-
 ```bash
 sudo apt-get update
 sudo apt-get install -y curl wget gnupg lsb-release
@@ -239,7 +273,6 @@ https://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main"
 ```
 
 ### D.2 Install ROS 2 Humble + Gazebo + tools
-
 ```bash
 sudo apt update
 sudo apt install -y \
@@ -254,7 +287,6 @@ rosdep update
 ```
 
 ### D.3 Workspace
-
 ```bash
 mkdir -p ~/go2_ws/src
 cd ~/go2_ws/src
@@ -271,7 +303,6 @@ source ~/go2_ws/install/setup.bash
 ```
 
 ### D.4 Optional: Namespaced robot_state_publisher with URDF params
-
 ```bash
 # Extract URDF from topic (multi-doc safe)
 ros2 topic echo --once /robot_description \
@@ -300,7 +331,6 @@ ros2 run robot_state_publisher robot_state_publisher \
 ---
 
 ## E) Appendix — Create `go2_demos` (optional)
-
 ```bash
 cd ~/go2_ws/src
 ros2 pkg create --build-type ament_python go2_demos --dependencies rclpy geometry_msgs nav_msgs
